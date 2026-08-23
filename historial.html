@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Historial - Torre Navarrete</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background-color: #f4f6f8; margin: 0; }
+        .header { text-align: center; color: #1a237e; padding-bottom: 10px; border-bottom: 2px solid #ddd; }
+        .tarjeta { background: white; padding: 16px; margin: 15px 0; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .titulo-item { font-weight: bold; color: #0d47a1; font-size: 1.1em; margin-bottom: 5px; }
+        p { margin: 4px 0; color: #333; }
+    </style>
+    <!-- Librerías de Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+</head>
+<body>
+
+    <div class="header">
+        <h1>Torre Navarrete</h1>
+    </div>
+    
+    <div id="info-equipo" class="tarjeta">
+        <h2>Cargando información del equipo...</h2>
+    </div>
+
+    <h3>Historial de Mantenimientos</h3>
+    <div id="lista-historial"></div>
+
+    <script>
+        // CONFIGURACIÓN DE TU PROYECTO FIREBASE
+        // (Copia estos datos exactamente desde Firebase Console > Configuración del proyecto > Apps Web)
+        const firebaseConfig = {
+            apiKey: "TU_API_KEY",
+            authDomain: "tu-proyecto.firebaseapp.com",
+            projectId: "tu-proyecto-id",
+            storageBucket: "tu-proyecto.appspot.com",
+            messagingSenderId: "123456789",
+            appId: "1:123456789:web:abcdef"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        // Leer el parámetro "?equipo=NOMBRE" enviado desde la URL del QR
+        const urlParams = new URLSearchParams(window.location.search);
+        const equipoNombre = urlParams.get('equipo');
+
+        if (equipoNombre) {
+            // 1. Cargar ficha general del equipo
+            db.collection("equipos").doc(equipoNombre).get().then((doc) => {
+                if (doc.exists) {
+                    const data = doc.data();
+                    document.getElementById("info-equipo").innerHTML = `
+                        <h2>${data.nombreEquipo}</h2>
+                        <p><strong>Marca:</strong> ${data.marca}</p>
+                        <p><strong>Modelo:</strong> ${data.modelo}</p>
+                        <p><strong>Fecha Instalación:</strong> ${data.fechaInstalacion}</p>
+                    `;
+                } else {
+                    document.getElementById("info-equipo").innerHTML = "<p>El equipo buscado no existe en la base de datos.</p>";
+                }
+            });
+
+            // 2. Cargar lista de correctivos
+            db.collection("equipos").doc(equipoNombre).collection("correctivos").get().then((querySnapshot) => {
+                const contenedor = document.getElementById("lista-historial");
+                if (querySnapshot.empty) {
+                    contenedor.innerHTML = "<p>No hay mantenimientos correctivos registrados para este equipo.</p>";
+                    return;
+                }
+                contenedor.innerHTML = "";
+                querySnapshot.forEach((doc) => {
+                    const item = doc.data();
+                    contenedor.innerHTML += `
+                        <div class="tarjeta">
+                            <p class="titulo-item">${item.piezaComponente}</p>
+                            <p><strong>Marca/Modelo:</strong> ${item.marca} / ${item.modelo}</p>
+                            <p><strong>Actividad:</strong> ${item.actividad}</p>
+                            <p><strong>Proveedor:</strong> ${item.proveedor}</p>
+                            <p><strong>Fecha:</strong> ${item.fechaCorrectivo}</p>
+                        </div>
+                    `;
+                });
+            });
+        } else {
+            document.getElementById("info-equipo").innerHTML = "<p>No se especificó ningún nombre de equipo en el enlace.</p>";
+        }
+    </script>
+</body>
+</html>
