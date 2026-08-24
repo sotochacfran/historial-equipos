@@ -46,7 +46,7 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getFirestore, doc, getDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-        // === REEMPLAZA ESTO CON TUS CREDENCIALES DE FIREBASE ===
+        // === REEMPLAZA ESTO CON TUS CREDENCIALES REALES DE FIREBASE ===
         const firebaseConfig = {
           apiKey: "AIzaSyBdgcmYF3-NYxm7ta-vO0RXRDQXhZf4xq4",
           authDomain: "navarreteequipos.firebaseapp.com",
@@ -74,6 +74,7 @@
             }
 
             try {
+                // 1. Cargar datos del equipo principal
                 const equipoRef = doc(db, "equipos", equipoNombre);
                 const equipoSnap = await getDoc(equipoRef);
 
@@ -88,10 +89,12 @@
                         <h2>${dataEquipo.nombreEquipo || equipoNombre}</h2>
                         <p><b>Marca:</b> ${dataEquipo.marca || 'N/A'}</p>
                         <p><b>Modelo:</b> ${dataEquipo.modelo || 'N/A'}</p>
+                        <p><b>Dato Técnico:</b> ${dataEquipo.datoTecnico || 'N/A'}</p>
                         <p><b>Fecha de Instalación:</b> ${dataEquipo.fechaInstalacion || 'N/A'}</p>
                     </div>
                 `;
 
+                // 2. Cargar la subcolección de correctivos
                 const correctivosRef = collection(db, "equipos", equipoNombre, "correctivos");
                 const correctivosSnap = await getDocs(correctivosRef);
 
@@ -102,6 +105,7 @@
 
                 correctivosGlobales = correctivosSnap.docs.map(doc => doc.data());
 
+                // Ordenar por fecha más reciente primero
                 correctivosGlobales.sort((a, b) => {
                     const parseFecha = (fechaStr) => {
                         if (!fechaStr) return 0;
