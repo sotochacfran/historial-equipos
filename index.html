@@ -1,36 +1,13 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Historial de Equipos</title>
-    <style>
-        body { font-family: Arial, sans-serif; padding: 20px; background-color: #f4f4f9; max-width: 600px; margin: auto; }
-        .card { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 15px; }
-        h1, h2, h3 { color: #333; text-align: center; }
-        .correctivo-card { border-left: 5px solid #0288d1; }
-        
-        /* Buscador con Autocompletado */
-        .filter-container { margin-bottom: 20px; }
-        input[type="text"] {
-            width: 100%;
-            padding: 10px;
-            font-size: 14px;
-            border: 1px solid #ccc;
-            border-radius: 6px;
-            box-sizing: border-box;
-            text-transform: uppercase;
-        }
-    </style>
-</head>
-<body>
-
-    <h1>Historial de Equipos</h1>
-    <div id="info-equipo">Cargando información del equipo...</div>
-
+<!-- SECCIÓN DEL FILTRO -->
     <div class="filter-container" id="seccion-filtro" style="display: none;">
         <h3>Mantenimientos Correctivos</h3>
-        <input type="text" id="filtroPieza" list="lista-piezas" placeholder="Filtrar por Pieza/Componente/Consumible...">
+        <input 
+            type="text" 
+            id="filtroPieza" 
+            list="lista-piezas" 
+            placeholder="Escribe para buscar pieza/componente..."
+            autocomplete="off"
+        >
         <datalist id="lista-piezas"></datalist>
     </div>
 
@@ -68,7 +45,6 @@
             }
 
             try {
-                // 1. Cargar Datos del Equipo
                 const equipoRef = doc(db, "equipos", equipoNombre);
                 const equipoSnap = await getDoc(equipoRef);
 
@@ -87,7 +63,6 @@
                     </div>
                 `;
 
-                // 2. Cargar Subcolección de Correctivos
                 const correctivosRef = collection(db, "equipos", equipoNombre, "correctivos");
                 const correctivosSnap = await getDocs(correctivosRef);
 
@@ -96,10 +71,9 @@
                     return;
                 }
 
-                // Guardar los datos en el array global
                 correctivosGlobales = correctivosSnap.docs.map(doc => doc.data());
 
-                // 3. Ordenar por fecha (DD/MM/AAAA -> AAAA-MM-DD para ordenar adecuadamente)
+                // Ordenar por fecha más reciente primero
                 correctivosGlobales.sort((a, b) => {
                     const parseFecha = (fechaStr) => {
                         if (!fechaStr) return 0;
@@ -109,14 +83,13 @@
                         }
                         return 0;
                     };
-                    return parseFecha(b.fechaCorrectivo) - parseFecha(a.fechaCorrectivo); // El más reciente primero
+                    return parseFecha(b.fechaCorrectivo) - parseFecha(a.fechaCorrectivo);
                 });
 
-                // Mostrar la sección del filtro y cargar la lista desplegable de sugerencias
                 document.getElementById('seccion-filtro').style.display = 'block';
-                cargarAutocompletado();
-
-                // Renderizar la lista inicial
+                
+                // Cargar todas las piezas únicas para el autocompletado inicial
+                actualizarOpcionesAutocompletado("");
                 renderizarCorrectivos(correctivosGlobales);
 
             } catch (error) {
@@ -125,20 +98,26 @@
             }
         }
 
-        // Carga las sugerencias en el menú desplegable del buscador
-        function cargarAutocompletado() {
+        // Genera dinámicamente las opciones del <datalist> según el texto escrito
+        function actualizarOpcionesAutocompletado(textoBusqueda) {
             const dataList = document.getElementById('lista-piezas');
-            const piezasUnicas = [...new Set(correctivosGlobales.map(c => c.piezaComponente).filter(Boolean))];
-            
             dataList.innerHTML = '';
-            piezasUnicas.forEach(pieza => {
+
+            // Extraer nombres de piezas sin duplicados
+            const piezasUnicas = [...new Set(correctivosGlobales.map(c => c.piezaComponente).filter(Boolean))];
+
+            // Filtrar las piezas que COMIENZAN o CONTIENEN el texto introducido
+            const piezasFiltradas = piezasUnicas.filter(pieza => 
+                pieza.toUpperCase().includes(textoBusqueda.toUpperCase())
+            );
+
+            piezasFiltradas.forEach(pieza => {
                 const option = document.createElement('option');
                 option.value = pieza;
                 dataList.appendChild(option);
             });
         }
 
-        // Muestra en la pantalla las tarjetas filtradas u ordenadas
         function renderizarCorrectivos(lista) {
             const divCorrectivos = document.getElementById('lista-correctivos');
             divCorrectivos.innerHTML = '';
@@ -162,17 +141,22 @@
             });
         }
 
-        // Escuchar cambios en la caja de texto para filtrar en tiempo real
-        document.getElementById('filtroPieza').addEventListener('input', (e) => {
-            const textoBusqueda = e.target.value.trim().toUpperCase();
+        const inputFiltro = document.getElementById('filtroPieza');
+
+        // Evento al escribir cada letra
+        inputFiltro.addEventListener('input', (e) => {
+            const valor = e.target.value.trim();
+            
+            // Actualiza las opciones del desplegable al escribir desde el 1er carácter
+            actualizarOpcionesAutocompletado(valor);
+
+            // Filtra la lista de tarjetas
             const listaFiltrada = correctivosGlobales.filter(corr => {
                 const pieza = (corr.piezaComponente || '').toUpperCase();
-                return pieza.includes(textoBusqueda);
+                return pieza.includes(valor.toUpperCase());
             });
             renderizarCorrectivos(listaFiltrada);
         });
 
         cargarDatos();
     </script>
-</body>
-</html>
