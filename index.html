@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Historial de Equipos</title>
+    <!-- Librería html2pdf.js para exportar la vista a PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
         body { font-family: Arial, sans-serif; padding: 20px; background-color: #f4f4f9; max-width: 600px; margin: auto; }
         .card { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 15px; }
@@ -21,26 +23,51 @@
             box-sizing: border-box;
             text-transform: uppercase;
         }
+
+        /* Estilo para el botón Exportar a PDF */
+        .btn-pdf {
+            width: 100%;
+            background-color: #5c6bc0;
+            color: white;
+            padding: 12px;
+            border: none;
+            border-radius: 6px;
+            font-size: 15px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-bottom: 15px;
+            transition: background 0.3s;
+        }
+        .btn-pdf:hover {
+            background-color: #3f51b5;
+        }
     </style>
 </head>
 <body>
 
     <h1>Historial de Equipos</h1>
-    <div id="info-equipo">Cargando información del equipo...</div>
 
-    <div class="filter-container" id="seccion-filtro" style="display: none;">
-        <h3>Mantenimientos Correctivos</h3>
-        <input 
-            type="text" 
-            id="filtroPieza" 
-            list="lista-piezas" 
-            placeholder="Escribe para buscar pieza/componente..."
-            autocomplete="off"
-        >
-        <datalist id="lista-piezas"></datalist>
+    <!-- Botón Exportar PDF (Oculto inicialmente) -->
+    <button id="btnExportarPdf" class="btn-pdf" style="display: none;">Exportar a PDF</button>
+
+    <!-- ÁREA A EXPORTAR EN EL PDF -->
+    <div id="contenido-exportar">
+        <div id="info-equipo">Cargando información del equipo...</div>
+
+        <div class="filter-container" id="seccion-filtro" style="display: none;">
+            <h3>Mantenimientos Correctivos</h3>
+            <input 
+                type="text" 
+                id="filtroPieza" 
+                list="lista-piezas" 
+                placeholder="Escribe para buscar pieza/componente..."
+                autocomplete="off"
+            >
+            <datalist id="lista-piezas"></datalist>
+        </div>
+
+        <div id="lista-correctivos"></div>
     </div>
-
-    <div id="lista-correctivos"></div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
@@ -61,6 +88,7 @@
         const db = getFirestore(app);
 
         let correctivosGlobales = [];
+        let nombreEquipoActual = "Equipo";
 
         async function cargarDatos() {
             const divEquipo = document.getElementById('info-equipo');
@@ -84,9 +112,11 @@
                 }
 
                 const dataEquipo = equipoSnap.data();
+                nombreEquipoActual = dataEquipo.nombreEquipo || equipoNombre;
+
                 divEquipo.innerHTML = `
                     <div class="card">
-                        <h2>${dataEquipo.nombreEquipo || equipoNombre}</h2>
+                        <h2>${nombreEquipoActual}</h2>
                         <p><b>Marca:</b> ${dataEquipo.marca || 'N/A'}</p>
                         <p><b>Modelo:</b> ${dataEquipo.modelo || 'N/A'}</p>
                         <p><b>Dato Técnico:</b> ${dataEquipo.datoTecnico || 'N/A'}</p>
@@ -100,6 +130,7 @@
 
                 if (correctivosSnap.empty) {
                     divCorrectivos.innerHTML = "<p style='text-align:center;'>No hay registros de mantenimientos correctivos.</p>";
+                    document.getElementById('btnExportarPdf').style.display = 'block';
                     return;
                 }
 
@@ -119,6 +150,7 @@
                 });
 
                 document.getElementById('seccion-filtro').style.display = 'block';
+                document.getElementById('btnExportarPdf').style.display = 'block';
                 
                 actualizarOpcionesAutocompletado("");
                 renderizarCorrectivos(correctivosGlobales);
@@ -169,8 +201,8 @@
             });
         }
 
+        // Evento de búsqueda / filtro
         const inputFiltro = document.getElementById('filtroPieza');
-
         inputFiltro.addEventListener('input', (e) => {
             const valor = e.target.value.trim();
             
@@ -181,6 +213,21 @@
                 return pieza.includes(valor.toUpperCase());
             });
             renderizarCorrectivos(listaFiltrada);
+        });
+
+        // Función para exportar el contenido actual a PDF
+        document.getElementById('btnExportarPdf').addEventListener('click', () => {
+            const elemento = document.getElementById('contenido-exportar');
+
+            const opciones = {
+                margin:       10,
+                filename:     `Historial_${nombreEquipoActual}.pdf`,
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2 },
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+
+            html2pdf().set(opciones).from(elemento).save();
         });
 
         cargarDatos();
