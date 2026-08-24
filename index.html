@@ -5,22 +5,42 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Historial de Equipos</title>
     <style>
-        body { font-family: Arial, sans-serif; padding: 20px; background-color: #f4f4f9; }
+        body { font-family: Arial, sans-serif; padding: 20px; background-color: #f4f4f9; max-width: 600px; margin: auto; }
         .card { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 15px; }
-        h1, h2, h3 { color: #333; }
-        .correctivo-card { border-left: 4px solid #0288d1; }
+        h1, h2, h3 { color: #333; text-align: center; }
+        .correctivo-card { border-left: 5px solid #0288d1; }
+        
+        /* Buscador con Autocompletado */
+        .filter-container { margin-bottom: 20px; }
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            font-size: 14px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            box-sizing: border-box;
+            text-transform: uppercase;
+        }
     </style>
 </head>
 <body>
 
     <h1>Historial de Equipos</h1>
-    <div id="contenido">Cargando información del equipo...</div>
+    <div id="info-equipo">Cargando información del equipo...</div>
+
+    <div class="filter-container" id="seccion-filtro" style="display: none;">
+        <h3>Mantenimientos Correctivos</h3>
+        <input type="text" id="filtroPieza" list="lista-piezas" placeholder="Filtrar por Pieza/Componente/Consumible...">
+        <datalist id="lista-piezas"></datalist>
+    </div>
+
+    <div id="lista-correctivos"></div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getFirestore, doc, getDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-        // === REEMPLAZA ESTOS DATOS CON TUS CREDENCIALES DE FIREBASE CONSOLE ===
+        // === TUS CREDENCIALES DE FIREBASE ===
         const firebaseConfig = {
           apiKey: "AIzaSyBdgcmYF3-NYxm7ta-vO0RXRDQXhZf4xq4",
           authDomain: "navarreteequipos.firebaseapp.com",
@@ -34,68 +54,123 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
+        let correctivosGlobales = [];
+
         async function cargarDatos() {
-            const contenedor = document.getElementById('contenido');
-            
-            // Obtener el parámetro 'equipo' de la URL
+            const divEquipo = document.getElementById('info-equipo');
+            const divCorrectivos = document.getElementById('lista-correctivos');
             const urlParams = new URLSearchParams(window.location.search);
             const equipoNombre = urlParams.get('equipo');
 
             if (!equipoNombre) {
-                contenedor.innerHTML = "<p style='color: red;'>No se especificó ningún nombre de equipo en la URL.</p>";
+                divEquipo.innerHTML = "<p style='color: red;'>No se especificó un equipo en la URL.</p>";
                 return;
             }
 
             try {
-                // 1. Obtener datos del equipo principal
+                // 1. Cargar Datos del Equipo
                 const equipoRef = doc(db, "equipos", equipoNombre);
                 const equipoSnap = await getDoc(equipoRef);
 
                 if (!equipoSnap.exists()) {
-                    contenedor.innerHTML = `<p style='color: red;'>El equipo <b>${equipoNombre}</b> no existe en la base de datos.</p>`;
+                    divEquipo.innerHTML = `<p style='color: red;'>El equipo <b>${equipoNombre}</b> no existe.</p>`;
                     return;
                 }
 
                 const dataEquipo = equipoSnap.data();
-                let html = `
+                divEquipo.innerHTML = `
                     <div class="card">
                         <h2>${dataEquipo.nombreEquipo || equipoNombre}</h2>
                         <p><b>Marca:</b> ${dataEquipo.marca || 'N/A'}</p>
                         <p><b>Modelo:</b> ${dataEquipo.modelo || 'N/A'}</p>
                         <p><b>Fecha de Instalación:</b> ${dataEquipo.fechaInstalacion || 'N/A'}</p>
                     </div>
-                    <h3>Mantenimientos Correctivos</h3>
                 `;
 
-                // 2. Obtener la subcolección 'correctivos'
+                // 2. Cargar Subcolección de Correctivos
                 const correctivosRef = collection(db, "equipos", equipoNombre, "correctivos");
                 const correctivosSnap = await getDocs(correctivosRef);
 
                 if (correctivosSnap.empty) {
-                    html += "<p>No hay registros de mantenimientos correctivos para este equipo.</p>";
-                } else {
-                    correctivosSnap.forEach((doc) => {
-                        const corr = doc.data();
-                        html += `
-                            <div class="card correctivo-card">
-                                <p><b>Pieza / Componente:</b> ${corr.piezaComponente || 'N/A'}</p>
-                                <p><b>Marca:</b> ${corr.marca || 'N/A'}</p>
-                                <p><b>Modelo:</b> ${corr.modelo || 'N/A'}</p>
-                                <p><b>Actividad:</b> ${corr.actividad || 'N/A'}</p>
-                                <p><b>Proveedor:</b> ${corr.proveedor || 'N/A'}</p>
-                                <p><b>Fecha Correctivo:</b> ${corr.fechaCorrectivo || 'N/A'}</p>
-                            </div>
-                        `;
-                    });
+                    divCorrectivos.innerHTML = "<p style='text-align:center;'>No hay registros de mantenimientos correctivos.</p>";
+                    return;
                 }
 
-                contenedor.innerHTML = html;
+                // Guardar los datos en el array global
+                correctivosGlobales = correctivosSnap.docs.map(doc => doc.data());
+
+                // 3. Ordenar por fecha (DD/MM/AAAA -> AAAA-MM-DD para ordenar adecuadamente)
+                correctivosGlobales.sort((a, b) => {
+                    const parseFecha = (fechaStr) => {
+                        if (!fechaStr) return 0;
+                        const partes = fechaStr.split('/');
+                        if (partes.length === 3) {
+                            return new Date(`${partes[2]}-${partes[1]}-${partes[0]}`).getTime();
+                        }
+                        return 0;
+                    };
+                    return parseFecha(b.fechaCorrectivo) - parseFecha(a.fechaCorrectivo); // El más reciente primero
+                });
+
+                // Mostrar la sección del filtro y cargar la lista desplegable de sugerencias
+                document.getElementById('seccion-filtro').style.display = 'block';
+                cargarAutocompletado();
+
+                // Renderizar la lista inicial
+                renderizarCorrectivos(correctivosGlobales);
 
             } catch (error) {
                 console.error("Error al consultar Firestore:", error);
-                contenedor.innerHTML = `<p style='color: red;'>Error al cargar los datos: ${error.message}</p>`;
+                divEquipo.innerHTML = `<p style='color: red;'>Error al cargar los datos: ${error.message}</p>`;
             }
         }
+
+        // Carga las sugerencias en el menú desplegable del buscador
+        function cargarAutocompletado() {
+            const dataList = document.getElementById('lista-piezas');
+            const piezasUnicas = [...new Set(correctivosGlobales.map(c => c.piezaComponente).filter(Boolean))];
+            
+            dataList.innerHTML = '';
+            piezasUnicas.forEach(pieza => {
+                const option = document.createElement('option');
+                option.value = pieza;
+                dataList.appendChild(option);
+            });
+        }
+
+        // Muestra en la pantalla las tarjetas filtradas u ordenadas
+        function renderizarCorrectivos(lista) {
+            const divCorrectivos = document.getElementById('lista-correctivos');
+            divCorrectivos.innerHTML = '';
+
+            if (lista.length === 0) {
+                divCorrectivos.innerHTML = "<p style='text-align:center;'>No se encontraron coincidencias.</p>";
+                return;
+            }
+
+            lista.forEach(corr => {
+                divCorrectivos.innerHTML += `
+                    <div class="card correctivo-card">
+                        <p><b>Pieza / Componente:</b> ${corr.piezaComponente || 'N/A'}</p>
+                        <p><b>Marca:</b> ${corr.marca || 'N/A'}</p>
+                        <p><b>Modelo:</b> ${corr.modelo || 'N/A'}</p>
+                        <p><b>Actividad:</b> ${corr.actividad || 'N/A'}</p>
+                        <p><b>Proveedor:</b> ${corr.proveedor || 'N/A'}</p>
+                        <p><b>Fecha Correctivo:</b> ${corr.fechaCorrectivo || 'N/A'}</p>
+                    </div>
+                `;
+            });
+        }
+
+        // Escuchar cambios en la caja de texto para filtrar en tiempo real
+        document.getElementById('filtroPieza').addEventListener('input', (e) => {
+            const textoBusqueda = e.target.value.trim().toUpperCase();
+            const listaFiltrada = correctivosGlobales.filter(corr => {
+                const pieza = (corr.piezaComponente || '').toUpperCase();
+                return pieza.includes(textoBusqueda);
+            });
+            renderizarCorrectivos(listaFiltrada);
+        });
 
         cargarDatos();
     </script>
