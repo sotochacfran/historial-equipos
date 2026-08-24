@@ -1,56 +1,103 @@
-import { db } from './firebase-config.js'; // Tu configuración de Firebase
-import { doc, getDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.x.x/firebase-firestore.js";
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Historial de Equipos</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background-color: #f4f4f9; }
+        .card { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 15px; }
+        h1, h2, h3 { color: #333; }
+        .correctivo-card { border-left: 4px solid #0288d1; }
+    </style>
+</head>
+<body>
 
-// Obtener el parámetro 'equipo' de la URL
-const urlParams = new URLSearchParams(window.location.search);
-const nombreEquipo = urlParams.get('equipo');
+    <h1>Historial de Equipos</h1>
+    <div id="contenido">Cargando información del equipo...</div>
 
-async function cargarHistorial() {
-    if (!nombreEquipo) {
-        document.getElementById('resultado').innerHTML = "No se especificó un equipo.";
-        return;
-    }
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, doc, getDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-    // 1. Obtener los datos del equipo principal
-    const equipoRef = doc(db, "equipos", nombreEquipo);
-    const equipoSnap = await getDoc(equipoRef);
+        // === REEMPLAZA ESTOS DATOS CON TUS CREDENCIALES DE FIREBASE CONSOLE ===
+        const firebaseConfig = {
+          apiKey: "AIzaSyBdgcmYF3-NYxm7ta-vO0RXRDQXhZf4xq4",
+          authDomain: "navarreteequipos.firebaseapp.com",
+          projectId: "navarreteequipos",
+          storageBucket: "navarreteequipos.firebasestorage.app",
+          messagingSenderId: "131453739262",
+          appId: "1:131453739262:web:5bbec395040800f188c5af",
+          measurementId: "G-DTF0V3WWS6"
+        };
 
-    if (equipoSnap.exists()) {
-        const dataEquipo = equipoSnap.data();
-        let html = `<h2>${dataEquipo.nombreEquipo}</h2>`;
-        html += `<p><b>Marca:</b> ${dataEquipo.marca}</p>`;
-        html += `<p><b>Modelo:</b> ${dataEquipo.modelo}</p>`;
-        html += `<p><b>Fecha Instalación:</b> ${dataEquipo.fechaInstalacion}</p>`;
-        html += `<hr><h3>Historial de Correctivos</h3>`;
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
 
-        // 2. OBTENER LA SUBCOLECCIÓN DE CORRECTIVOS
-        const correctivosRef = collection(db, "equipos", nombreEquipo, "correctivos");
-        const correctivosSnap = await getDocs(correctivosRef);
+        async function cargarDatos() {
+            const contenedor = document.getElementById('contenido');
+            
+            // Obtener el parámetro 'equipo' de la URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const equipoNombre = urlParams.get('equipo');
 
-        if (correctivosSnap.empty) {
-            html += `<p>No hay mantenimientos correctivos registrados para este equipo.</p>`;
-        } else {
-            html += `<ul style="list-style-type: none; padding: 0;">`;
-            correctivosSnap.forEach((doc) => {
-                const corr = doc.data();
-                html += `
-                    <li style="border: 1px solid #ccc; margin-bottom: 10px; padding: 10px; border-radius: 8px;">
-                        <p><b>Pieza / Componente:</b> ${corr.piezaComponente}</p>
-                        <p><b>Marca:</b> ${corr.marca}</p>
-                        <p><b>Modelo:</b> ${corr.modelo}</p>
-                        <p><b>Actividad:</b> ${corr.actividad}</p>
-                        <p><b>Proveedor:</b> ${corr.proveedor}</p>
-                        <p><b>Fecha Correctivo:</b> ${corr.fechaCorrectivo}</p>
-                    </li>
+            if (!equipoNombre) {
+                contenedor.innerHTML = "<p style='color: red;'>No se especificó ningún nombre de equipo en la URL.</p>";
+                return;
+            }
+
+            try {
+                // 1. Obtener datos del equipo principal
+                const equipoRef = doc(db, "equipos", equipoNombre);
+                const equipoSnap = await getDoc(equipoRef);
+
+                if (!equipoSnap.exists()) {
+                    contenedor.innerHTML = `<p style='color: red;'>El equipo <b>${equipoNombre}</b> no existe en la base de datos.</p>`;
+                    return;
+                }
+
+                const dataEquipo = equipoSnap.data();
+                let html = `
+                    <div class="card">
+                        <h2>${dataEquipo.nombreEquipo || equipoNombre}</h2>
+                        <p><b>Marca:</b> ${dataEquipo.marca || 'N/A'}</p>
+                        <p><b>Modelo:</b> ${dataEquipo.modelo || 'N/A'}</p>
+                        <p><b>Fecha de Instalación:</b> ${dataEquipo.fechaInstalacion || 'N/A'}</p>
+                    </div>
+                    <h3>Mantenimientos Correctivos</h3>
                 `;
-            });
-            html += `</ul>`;
+
+                // 2. Obtener la subcolección 'correctivos'
+                const correctivosRef = collection(db, "equipos", equipoNombre, "correctivos");
+                const correctivosSnap = await getDocs(correctivosRef);
+
+                if (correctivosSnap.empty) {
+                    html += "<p>No hay registros de mantenimientos correctivos para este equipo.</p>";
+                } else {
+                    correctivosSnap.forEach((doc) => {
+                        const corr = doc.data();
+                        html += `
+                            <div class="card correctivo-card">
+                                <p><b>Pieza / Componente:</b> ${corr.piezaComponente || 'N/A'}</p>
+                                <p><b>Marca:</b> ${corr.marca || 'N/A'}</p>
+                                <p><b>Modelo:</b> ${corr.modelo || 'N/A'}</p>
+                                <p><b>Actividad:</b> ${corr.actividad || 'N/A'}</p>
+                                <p><b>Proveedor:</b> ${corr.proveedor || 'N/A'}</p>
+                                <p><b>Fecha Correctivo:</b> ${corr.fechaCorrectivo || 'N/A'}</p>
+                            </div>
+                        `;
+                    });
+                }
+
+                contenedor.innerHTML = html;
+
+            } catch (error) {
+                console.error("Error al consultar Firestore:", error);
+                contenedor.innerHTML = `<p style='color: red;'>Error al cargar los datos: ${error.message}</p>`;
+            }
         }
 
-        document.getElementById('resultado').innerHTML = html;
-    } else {
-        document.getElementById('resultado').innerHTML = "El equipo no existe en la base de datos.";
-    }
-}
-
-cargarHistorial();
+        cargarDatos();
+    </script>
+</body>
+</html>
