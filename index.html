@@ -1,4 +1,33 @@
-<!-- SECCIÓN DEL FILTRO -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Historial de Equipos</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background-color: #f4f4f9; max-width: 600px; margin: auto; }
+        .card { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 15px; }
+        h1, h2, h3 { color: #333; text-align: center; }
+        .correctivo-card { border-left: 5px solid #0288d1; }
+        
+        /* Buscador con Autocompletado */
+        .filter-container { margin-bottom: 20px; }
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            font-size: 14px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            box-sizing: border-box;
+            text-transform: uppercase;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Historial de Equipos</h1>
+    <div id="info-equipo">Cargando información del equipo...</div>
+
     <div class="filter-container" id="seccion-filtro" style="display: none;">
         <h3>Mantenimientos Correctivos</h3>
         <input 
@@ -17,7 +46,7 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getFirestore, doc, getDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-        // === TUS CREDENCIALES DE FIREBASE ===
+        // === REEMPLAZA ESTO CON TUS CREDENCIALES DE FIREBASE ===
         const firebaseConfig = {
           apiKey: "AIzaSyBdgcmYF3-NYxm7ta-vO0RXRDQXhZf4xq4",
           authDomain: "navarreteequipos.firebaseapp.com",
@@ -73,7 +102,6 @@
 
                 correctivosGlobales = correctivosSnap.docs.map(doc => doc.data());
 
-                // Ordenar por fecha más reciente primero
                 correctivosGlobales.sort((a, b) => {
                     const parseFecha = (fechaStr) => {
                         if (!fechaStr) return 0;
@@ -88,7 +116,6 @@
 
                 document.getElementById('seccion-filtro').style.display = 'block';
                 
-                // Cargar todas las piezas únicas para el autocompletado inicial
                 actualizarOpcionesAutocompletado("");
                 renderizarCorrectivos(correctivosGlobales);
 
@@ -98,15 +125,12 @@
             }
         }
 
-        // Genera dinámicamente las opciones del <datalist> según el texto escrito
         function actualizarOpcionesAutocompletado(textoBusqueda) {
             const dataList = document.getElementById('lista-piezas');
             dataList.innerHTML = '';
 
-            // Extraer nombres de piezas sin duplicados
             const piezasUnicas = [...new Set(correctivosGlobales.map(c => c.piezaComponente).filter(Boolean))];
 
-            // Filtrar las piezas que COMIENZAN o CONTIENEN el texto introducido
             const piezasFiltradas = piezasUnicas.filter(pieza => 
                 pieza.toUpperCase().includes(textoBusqueda.toUpperCase())
             );
@@ -143,14 +167,11 @@
 
         const inputFiltro = document.getElementById('filtroPieza');
 
-        // Evento al escribir cada letra
         inputFiltro.addEventListener('input', (e) => {
             const valor = e.target.value.trim();
             
-            // Actualiza las opciones del desplegable al escribir desde el 1er carácter
             actualizarOpcionesAutocompletado(valor);
 
-            // Filtra la lista de tarjetas
             const listaFiltrada = correctivosGlobales.filter(corr => {
                 const pieza = (corr.piezaComponente || '').toUpperCase();
                 return pieza.includes(valor.toUpperCase());
@@ -160,3 +181,5 @@
 
         cargarDatos();
     </script>
+</body>
+</html>
